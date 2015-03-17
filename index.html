@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>Web Worker | Local Storage Demo</title>
+	<style rel="stylesheet" type="text/css">
+		body {font-family: 'Trebuchet MS',arial;}
+		h2 {margin:2px;}
+		p {margin:3px;font-size: 12px;}
+		button {padding:10px;}
+	</style>
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.0/jquery.min.js"></script>
+	<script src="scripts/random.js" type="text/javascript"></script>
+	<script type="text/javascript">
+		var divStorage, divMove, xPos, yPos, direction, worker, directPoll,
+			store = false,
+			storeCount = 0;
+
+		function localStore(el){
+			if (el.value === 'on'){
+				localStorage['use_storage'] = 'true';
+				store = true;
+			} else {
+				localStorage['use_storage'] = 'false';
+				store = false;
+			}
+		}
+		function handle_storage(e){
+			if (!e) { e = window.event; }
+		}
+		function startWorker(el){
+			clearInterval(directPoll);
+			document.getElementById('btnDirect').innerHTML = 'Direct Poll';
+			if (typeof Worker !== 'undefined'){
+				if (el.innerHTML.indexOf('Start') > -1){
+					el.innerHTML = 'Stop Worker';
+					if (typeof worker !== 'undefined'){
+						worker.postMessage('start');
+					} else {
+						worker = new Worker('scripts/random-ww.js');
+						if (window.addEventListener) {
+							window.addEventListener("storage", handle_storage, false);
+							worker.addEventListener('message', function(e) {
+								writeData(e.data);
+						}, false);
+						} else {
+							window.attachEvent("onstorage", handle_storage);
+							worker.attachEvent('message', function(e) {
+								writeData(e.data);
+							}, false);
+						};
+					}
+				} else {
+					if (typeof worker !== 'undefined') {
+						worker.postMessage('stop');
+					}
+					el.innerHTML = 'Start Worker';
+				}
+			} else {
+				divStorage.html('Sorry, no web worker support on this device\/browser!');
+			}
+		}
+		function pollDirect(el){
+			if (typeof worker !== 'undefined')
+				{worker.postMessage('stop');
+				document.getElementById('btnWorker').innerHTML = 'Start Worker';
+			}
+			if (el.innerHTML.indexOf('Direct') > -1) {
+				el.innerHTML = 'Stop Poll';
+				directPoll = setInterval(function(){
+					getData();
+				},2000);
+			} else {
+				el.innerHTML = 'Direct Poll';
+				clearInterval(directPoll);
+			}
+		}
+		function animateBox(){
+			if (!direction)
+				{direction = 'r';}
+			xPos = parseInt(divMove.css('left'),10);
+			yPos = parseInt(divMove.css('top'),10);
+			switch (true)
+				{case (xPos >= 160 && direction === 'r'):
+					direction = 'd';
+				break;
+				case (yPos >= 160 && direction === 'd'):
+					direction = 'l';
+				break;
+				case (xPos === 0 && direction === 'l'):
+					direction = 'u';
+				break;
+				case (yPos === 0 && direction === 'u'):
+					direction = 'r';
+				}
+			switch (direction)
+				{case 'r':
+					xPos += 2;
+					divMove.css({left: xPos + 'px'});
+				break;
+				case 'd':
+					yPos += 2;
+					divMove.css({top: yPos + 'px'});
+				break;
+				case 'l':
+					xPos -= 2;
+					divMove.css({left: xPos + 'px'});
+				break;
+				case 'u':
+					yPos -= 2;
+					divMove.css({top: yPos + 'px'});
+				break;
+				}
+		}
+		function writeData(text){
+			if (divStorage.html().length > 0)
+				{divStorage.html(divStorage.html() + '<br/>' + text);}
+			else
+				{divStorage.html(text);}
+			if (store){
+				storeCount += 1;
+				//console.log(storeCount);
+				localStorage.setItem(storeCount.toString(),text);
+				//console.log(localStorage.length);
+			}
+		}
+		$(document).ready(function(){
+			divMove = $('#divMove');
+			divStorage = $('#divStorage');
+			setInterval(animateBox,20);
+			$('.radStorage').on('click',function(){
+				localStore(this);
+			});
+			$('#btnClearStorage').on('click',function(){
+				localStorage.clear();
+				store = false;
+				document.getElementById('radOff').checked = true;
+				divStorage.html('');
+			});
+			//console.log(localStorage['use_storage']);
+			if (localStorage.getItem('use_storage') === 'true'){
+				store = true;
+				document.getElementById('radOn').checked = true;
+				if (localStorage.length > 1){
+					storeCount = localStorage.length - 1;
+					//console.log(storeCount);
+					for (var i = 0; i < localStorage.length; i++){
+						if (localStorage.key(i).toString() === 'use_storage')
+							{continue;}
+						if (divStorage.html().length > 0){
+							divStorage.html(divStorage.html() + '<br/>' + localStorage.getItem(localStorage.key(i).toString()));
+						} else {
+							divStorage.html(localStorage.getItem(localStorage.key(i).toString()));
+						}
+					}
+				}
+			}
+		});
+	</script>
+</head>
+<body>
+	<div id="test" style="height:200px;width:200px;border:solid 1px #000000;position: relative;float:left;margin-right:5px;">
+		<div id="divMove" style="height:40px;width:40px;background: #ffaa22; position: absolute;top:0px;left:0px;"></div>
+	</div>
+	<h2>This page tests use of HTML5 local storage and web workers</h2>
+	<div><p>To use this page, click &quot;Direct Poll&quot; to see how directly hitting a web service synchronously without a web worker halts the orange box's animation.</p>
+	<p>To switch to a web worker, click &quot;Start Worker&quot; and notice the animation is no longer affected by a synchronous call to a web service, since the call is made in a different thread.</p>
+	<p>Turning on local storage will save any random strings that are added to the page in your browser's local storage cache. You can refresh the page, even close the browser and re-open it, and the previously fetched data will be restored.</p>
+	<p style="color:#ff0000;font-size:16px; ">NOTE: Of course you wouldn't normally poll a webservice <em>synchronously</em>, this was done for demonstration of web workers only.</p>
+	</div>
+	<div style="float:left;width:auto;">
+		<button id="btnDirect" type="button" onclick="pollDirect(this);" style="float:left;">Direct Poll</button>
+		<button id="btnWorker" type="button" onclick="startWorker(this);" style="float:left;">Start Worker</button>
+		<div style="border:1px solid #666666;padding:5px;float:left;width:300px;height:50px;margin-left:30px;">
+			<button style="float:right;" id="btnClearStorage">Clear Local Storage</button>
+			<div style="margin-left:20px;">Local Storage:</div>
+			<input id="radOn" type="radio" class="radStorage" name="webStorage" value="on"><label for="radOn">ON</label>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+			<input id="radOff" type="radio" class="radStorage" name="webStorage" value="off" checked="checked"><label for="radOff">OFF</label><br/>
+		</div>
+	</div>
+	<div id="divStorage" style="float:left;clear:left;"></div>
+	<script type="text/javascript">
+	// handle browsers that don't support console.log()
+	if (typeof console === 'undefined'){
+		var console = {};
+		console.log = function(){
+			return;
+		}
+	}
+	</script>
+</body>
+</html>
